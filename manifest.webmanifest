@@ -1,0 +1,17 @@
+{
+  "name": "BJT 경어 드릴",
+  "short_name": "경어 드릴",
+  "description": "BJT 대비 경어 드릴 — 단원식 나선형 복습, 문제마다 해설, 모든 한자 후리가나.",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ECEEE8",
+  "theme_color": "#FAFAF7",
+  "icons": [
+    {"src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}
