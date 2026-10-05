@@ -342,6 +342,10 @@ ruby u.k,u.k ruby{text-decoration-thickness:1.5px}
 
 .nextbar{position:fixed;left:0;right:0;bottom:0;z-index:25;padding:12px var(--pad) calc(12px + env(safe-area-inset-bottom,0px));background:var(--bg);border-top:1px solid var(--line)}
 .nextbar .btn{display:flex;max-width:640px;margin:0 auto}
+/* room under the last line = the bar's height (measured by app.js) + a small gap, so a full scroll
+   ends with the explanation sitting right on top of the bar */
+:root{--nbh:calc(79px + env(safe-area-inset-bottom,0px))}
+body[data-view="play"] .wrap{padding-bottom:calc(var(--nbh) + 16px)}
 
 /* ---------- word lists ---------- */
 .vlist{list-style:none;display:grid;grid-template-columns:1fr;column-gap:40px;margin:0;padding:0;border-top:1px solid var(--line)}
@@ -436,13 +440,18 @@ html.app .nextbar{padding-left:max(var(--pad),env(safe-area-inset-left,0px));pad
   .home-body .home-settings{grid-area:settings}
   .home-units > .sec-h:first-child{margin-top:0}
 
+  /* One scroller only — the page. The question column sticks (app.js fits its top so a tall one
+     still shows its options); the answer column scrolls with the page and its last line stops just
+     above the 다음 문제 bar. (A separate scroll pane here lost its end on iPad.) */
   .play-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 56px;align-items:start}
-  .play-a{position:sticky;top:calc(var(--top-h) + env(safe-area-inset-top,0px) + 84px);max-height:calc(100vh - var(--top-h) - env(safe-area-inset-top,0px) - 184px);overflow-y:auto;overscroll-behavior:contain;padding:12px 4px 8px 40px;border-left:1px solid var(--line);scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+  .play-q{position:sticky;top:calc(var(--top-h) + env(safe-area-inset-top,0px) + 84px)}
+  .play-a{align-self:stretch;padding:12px 4px calc(var(--nbh) - 4px) 40px;border-left:1px solid var(--line)}
+  body[data-view="play"] .wrap{padding-bottom:24px}   /* the bar only covers the answer column, so its room lives there */
   .play-a .fb{margin-top:0;padding-top:0;border-top:0}
   .fb-wait{display:block;padding-top:8px;color:var(--ink-3)}
   .fb-wait p{margin:0;font-size:14.5px}
   .fb-wait p + p{margin-top:6px}
-  .nextbar{left:calc(50% + 69px);right:max(var(--pad),calc((100vw - 1200px) / 2 + var(--pad)));padding-left:0;padding-right:0;background:none;border-top:0}
+  .nextbar{left:calc(50% + 69px);right:max(var(--pad),calc((100vw - 1200px) / 2 + var(--pad)));padding-left:0;padding-right:0}
   html.app .nextbar{padding-left:0;padding-right:0}
   .nextbar .btn{max-width:none}
   .sheet-day .memos{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -642,6 +651,7 @@ const EXAM = new Date(2026, 9, 7);
 const APP = !!window.__APP__;
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 const STANDALONE = window.navigator.standalone === true || (window.matchMedia && matchMedia("(display-mode: standalone)").matches);
+const WIDE = window.matchMedia("(min-width: 1024px)");   // two-column play layout (iPad landscape)
 
 /* ================= state ================= */
 const KEY = "keigo5-v1";
@@ -1206,6 +1216,7 @@ function renderQ(){
   shownAt = Date.now();
   if (e.a !== null && e.a !== undefined) paintAnswer(e, q, false);
   window.scrollTo(0, 0);
+  fitPlay();
 }
 function showTr(on){
   $$(".tr", $("#qcard")).forEach(x => x.hidden = !on);
@@ -1290,11 +1301,40 @@ function paintAnswer(e, q, animate){
   $("#next-btn").innerHTML = (S.sess.i + 1 >= S.sess.list.length ? "끝내기" : "다음 문제") + '<svg><use href="#i-next"/></svg>';
   $("#nextbar").hidden = false;
   $("#p-prog").style.width = pct(answered(S.sess), S.sess.list.length) + "%";
-  if (animate && window.matchMedia("(max-width: 1023px)").matches){
+  fitPlay();
+  if (animate){
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    setTimeout(() => { const r = fb.getBoundingClientRect(); if (r.top > window.innerHeight * .55) window.scrollBy({top: r.top - window.innerHeight * .34, behavior: still ? "auto" : "smooth"}); }, 120);
+    setTimeout(() => {
+      fitPlay();
+      const r = fb.getBoundingClientRect();
+      if (WIDE.matches){
+        // two columns: the verdict starts at the top of the right column — bring it back if the page was scrolled past it
+        const base = playTop();
+        if (r.top < base) window.scrollBy({top: r.top - base, behavior: still ? "auto" : "smooth"});
+      } else if (r.top > window.innerHeight * .55) window.scrollBy({top: r.top - window.innerHeight * .34, behavior: still ? "auto" : "smooth"});
+    }, 120);
   }
 }
+/* ---- play layout: the page is the only scroller ----
+   --nbh = the 다음 문제 bar's real height, so the page can always scroll the last line of the
+   explanation to just above the bar. On wide screens the question column is sticky; when it is
+   taller than the screen its top is lifted so the options stay reachable. */
+function playTop(){ const t = $(".top"); return (t ? t.getBoundingClientRect().bottom : 56) + 84; }
+function fitPlay(){
+  const nb = $("#nextbar");
+  if (nb && !nb.hidden && nb.offsetHeight) document.documentElement.style.setProperty("--nbh", nb.offsetHeight + "px");
+  const pq = $(".play-q"); if (!pq) return;
+  if (!WIDE.matches){ pq.style.top = ""; return; }
+  const base = playTop(), h = pq.offsetHeight, vh = window.innerHeight;
+  pq.style.top = Math.round(h > vh - base - 24 ? vh - h - 24 : base) + "px";
+}
+if (window.ResizeObserver){
+  const ro = new ResizeObserver(() => fitPlay());
+  [".play-q", "#nextbar"].forEach(s => { const el = $(s); if (el) ro.observe(el); });
+}
+window.addEventListener("resize", fitPlay);
+window.addEventListener("orientationchange", () => setTimeout(fitPlay, 300));
+if (WIDE.addEventListener) WIDE.addEventListener("change", fitPlay); else if (WIDE.addListener) WIDE.addListener(fitPlay);
 function optLine(q, o){
   const k = q.ok && q.ok[o] ? q.ok[o] : "";
   const ko = k ? ` <span class="oko">${esc(k.startsWith("(") ? k : "(" + k + ")")}</span>` : "";
