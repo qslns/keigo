@@ -83,6 +83,8 @@ b,strong{font-weight:600}
 .tbtn .fz{font:400 13.5px/1 var(--f-ja);color:var(--ink);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--line);text-underline-offset:7px}
 .tbtn:hover .fz{text-decoration-color:currentColor}
 .tbtn[aria-pressed="false"] .fz{color:var(--ink-3);text-decoration:line-through;text-decoration-color:currentColor}
+.tbtn .ft{font:500 13.5px/1 var(--f-ko);color:var(--ink);text-decoration:underline;text-decoration-thickness:1px;text-decoration-color:var(--line);text-underline-offset:7px}
+.tbtn:hover .ft{text-decoration-color:currentColor}
 
 /* ---------- layout & type ---------- */
 .wrap{max-width:680px;margin:0 auto;padding:44px var(--pad) 128px}
@@ -397,6 +399,7 @@ button,a,summary,.opt,label{-webkit-tap-highlight-color:transparent;touch-action
   .trbtn:hover{color:var(--ink-2);text-decoration-color:var(--line)}
   .tbtn:hover .fz{text-decoration-color:var(--line)}
   .tbtn[aria-pressed="false"]:hover .fz{text-decoration-color:currentColor}
+  .tbtn:hover .ft{text-decoration-color:var(--line)}
   .settings select:hover{border-color:var(--line)}
   .back:hover{color:var(--ink-3)}
   .alln > summary:hover,.voc > summary:hover,.iroot > summary:hover{color:var(--ink-3)}
@@ -488,6 +491,7 @@ html.app .nextbar{padding-left:max(var(--pad),env(safe-area-inset-left,0px));pad
   <span class="top-sp"></span>
   <span class="dchip" id="dchip" hidden></span>
   <button type="button" class="tbtn" id="furi-btn" aria-pressed="true"><span class="fz"><span class="ja" lang="ja">ふりがな</span></span></button>
+  <button type="button" class="tbtn" id="fs-btn" aria-pressed="false" hidden><span class="ft">전체화면</span></button>
 </header>
 
 <main class="wrap" id="app">
@@ -850,6 +854,42 @@ document.addEventListener("click", e => {
   if (!document.body.classList.contains("nofuri")) return;
   const r = e.target.closest("ruby"); if (r) r.classList.toggle("peek");
 });
+
+/* ================= 전체화면 =================
+   Safari on iPad (prefixed before iPadOS 16.4) and desktop browsers. The button stays hidden where the
+   page may not go fullscreen (iPhone, or a frame that forbids it). */
+const FS = {
+  on: () => !!(document.fullscreenElement || document.webkitFullscreenElement),
+  can: () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled),
+  enter(){
+    const d = document.documentElement;
+    try {
+      if (d.requestFullscreen) return Promise.resolve(d.requestFullscreen({navigationUI: "hide"}));
+      if (d.webkitRequestFullscreen){ d.webkitRequestFullscreen(); return Promise.resolve(); }
+    } catch (e) { return Promise.reject(e); }
+    return Promise.reject(new Error("fullscreen unavailable"));
+  },
+  exit(){
+    try {
+      if (document.exitFullscreen) return Promise.resolve(document.exitFullscreen());
+      if (document.webkitExitFullscreen){ document.webkitExitFullscreen(); return Promise.resolve(); }
+    } catch (e) {}
+    return Promise.resolve();
+  }
+};
+function paintFS(){
+  const b = $("#fs-btn"); if (!b) return;
+  const on = FS.on();
+  b.hidden = !on && !FS.can();
+  b.setAttribute("aria-pressed", String(on));
+  $(".ft", b).textContent = on ? "전체화면 끄기" : "전체화면";
+  document.documentElement.classList.toggle("fs", on);
+}
+$("#fs-btn").addEventListener("click", () => {
+  (FS.on() ? FS.exit() : FS.enter()).catch(() => {}).then(() => setTimeout(paintFS, 60));
+});
+["fullscreenchange", "webkitfullscreenchange"].forEach(t => document.addEventListener(t, () => { paintFS(); setTimeout(fitPlay, 80); }));
+paintFS();
 
 /* ================= audio: Microsoft Nanami clips (app build) → device voice as fallback ================= */
 const TTS = {ok: "speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined", ja: []};
