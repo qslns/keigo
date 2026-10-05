@@ -1,5 +1,5 @@
 /* BJT 경어 드릴 — offline cache. Version is stamped at build time. */
-const VERSION = "701f432910";
+const VERSION = "f42465b671";
 const CACHE = "keigo-drill-" + VERSION;
 const FONTS = "keigo-drill-fonts";
 const AUDIO = "keigo-audio-1";   // Microsoft Nanami clips — kept across app updates (file names are content hashes)
